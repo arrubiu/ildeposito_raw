@@ -1,0 +1,13 @@
+name: Il Deposito Raw
+type: module
+description: 'Fornisce dati grezzi delle entità per il frontend headless'
+package: Il Deposito
+core_version_requirement: ^11
+dependencies:
+  - drupal:node
+  - drupal:taxonomy
+  - drupal:media
+  - drupal:geofield
+  - drupal:system (>=11.0.0)
+suggests:
+  - ultimate_cron:ultimate_cron (>=3.0.0)

@@ -1,0 +1,131 @@
+<?php
+
+/**
+ * @file
+ * Hook implementations for Il Deposito Raw module.
+ */
+
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
+use Drupal\Core\Cache\Cache;
+
+/**
+ * Implements hook_entity_view_alter().
+ */
+function ildeposito_raw_entity_view_alter(array &$build, EntityInterface $entity, EntityViewDisplayInterface $display) {
+  /** @var \Drupal\ildeposito_raw\RawEntityManager $raw_manager */
+  $raw_manager = \Drupal::service('ildeposito_raw.manager');
+
+  if ($raw_manager->shouldProcessRaw($entity, $display->getMode())) {
+    // Ottieni i dati raw.
+    $data = $raw_manager->getRawData($entity);
+
+    // Permetti ai moduli e al tema di alterare i dati raw.
+    \Drupal::moduleHandler()->alter('ildeposito_raw_data', $data, $entity);
+    if (\Drupal::hasService('theme.manager')) {
+      $theme_name = \Drupal::theme()->getActiveTheme()->getName();
+      $function = $theme_name . '_ildeposito_raw_data_alter';
+      if (function_exists($function)) {
+        $function($data, $entity);
+      }
+    }
+
+    // Calcola cache metadata.
+    $cache_tags = $raw_manager->collectCacheTags($entity);
+    $cache_contexts = $raw_manager->getCacheContexts($entity);
+
+    // Ottieni max-age dalla configurazione del modulo.
+    $config = \Drupal::config('ildeposito_raw.settings');
+    $max_age = $config->get('cache_max_age') ?? Cache::PERMANENT;
+
+    // Svuota il build array e aggiungi solo i dati raw.
+    $view_mode = $display->getMode();
+    $build = [
+      '#theme' => 'ildeposito_raw',
+      '#entity' => $entity,
+      '#entity_type' => $entity->getEntityTypeId(),
+      '#data' => $data,
+      '#title' => $entity->label(),
+      '#view_mode' => $view_mode,
+      '#cache' => [
+        'tags' => Cache::mergeTags($cache_tags, ['ildeposito_raw:entity:' . $entity->getEntityTypeId()]),
+        'contexts' => Cache::mergeContexts(['languages:language_interface'], $cache_contexts),
+        'max-age' => $max_age,
+      ],
+    ];
+    // Aggiungi la chiave #node se l'entità è un nodo.
+    if ($entity->getEntityTypeId() === 'node') {
+      $build['#node'] = $entity;
+    }
+  }
+}
+
+/**
+ * Implements hook_theme_suggestions_ildeposito_raw_entity_alter().
+ */
+function ildeposito_raw_theme_suggestions_ildeposito_raw_alter(array &$suggestions, array $variables) {
+  // Debug condizionato solo in ambiente di sviluppo
+  if (\Drupal::state()->get('ildeposito_raw.debug_mode', FALSE)) {
+    \Drupal::logger('ildeposito_raw')->notice('<pre>' . print_r(array_keys($variables), TRUE) . '</pre>');
+  }
+  if (!empty($variables['entity']) && $variables['entity'] instanceof \Drupal\Core\Entity\EntityInterface) {
+    $entity = $variables['entity'];
+    $entity_type = $entity->getEntityTypeId();
+    $bundle = $entity->bundle();
+    $view_mode = $variables['view_mode'] ?? NULL;
+    // Suggerimento: ildeposito_raw, ildeposito_raw__bundle, ildeposito_raw__bundle__viewmode
+    $suggestions[] = 'ildeposito_raw';
+    if ($bundle) {
+      $suggestions[] = 'ildeposito_raw__' . $bundle;
+    }
+    if ($bundle && $view_mode) {
+      $suggestions[] = 'ildeposito_raw__' . $bundle . '__' . $view_mode;
+    }
+  }
+}
+
+/**
+ * Implements hook_theme().
+ */
+function ildeposito_raw_theme() {
+  return [
+    'ildeposito_raw' => [
+      'variables' => [
+        'entity' => NULL,
+        'data' => [],
+        'view_mode' => NULL,
+      ],
+    ],
+  ];
+}
+
+/**
+ * Implements hook_module_implements_alter().
+ */
+function ildeposito_raw_module_implements_alter(&$implementations, $hook) {
+  if ($hook == 'entity_view_alter') {
+    // Sposta ildeposito_raw per ultimo così che possa sovrascrivere
+    // le altre alterazioni
+    $group = $implementations['ildeposito_raw'];
+    unset($implementations['ildeposito_raw']);
+    $implementations['ildeposito_raw'] = $group;
+  }
+}
+
+/**
+ * Implements hook_entity_update().
+ */
+function ildeposito_raw_entity_update(EntityInterface $entity) {
+  /** @var \Drupal\ildeposito_raw\RawEntityManager $raw_manager */
+  $raw_manager = \Drupal::service('ildeposito_raw.manager');
+  $raw_manager->invalidateCache($entity);
+}
+
+/**
+ * Implements hook_entity_delete().
+ */
+function ildeposito_raw_entity_delete(EntityInterface $entity) {
+  /** @var \Drupal\ildeposito_raw\RawEntityManager $raw_manager */
+  $raw_manager = \Drupal::service('ildeposito_raw.manager');
+  $raw_manager->invalidateCache($entity);
+}
