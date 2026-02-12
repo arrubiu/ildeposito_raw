@@ -4,6 +4,7 @@ namespace Drupal\ildeposito_raw\Form;
 
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Datetime\DateFormatterInterface;
 use Drupal\Core\State\StateInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -30,12 +31,15 @@ class RawCacheSettingsForm extends ConfigFormBase {
   /**
    * Costruttore.
    *
+   * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
+   *   Il servizio config.factory.
    * @param \Drupal\Core\Datetime\DateFormatterInterface $date_formatter
    *   Il servizio date.formatter.
    * @param \Drupal\Core\State\StateInterface $state
    *   Il servizio state.
    */
-  public function __construct(DateFormatterInterface $date_formatter, StateInterface $state) {
+  public function __construct(ConfigFactoryInterface $config_factory, DateFormatterInterface $date_formatter, StateInterface $state) {
+    parent::__construct($config_factory);
     $this->dateFormatter = $date_formatter;
     $this->state = $state;
   }
@@ -45,6 +49,7 @@ class RawCacheSettingsForm extends ConfigFormBase {
    */
   public static function create(ContainerInterface $container) {
     return new static(
+      $container->get('config.factory'),
       $container->get('date.formatter'),
       $container->get('state')
     );

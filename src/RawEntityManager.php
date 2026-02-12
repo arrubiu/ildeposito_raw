@@ -20,9 +20,6 @@ use Drupal\Core\Language\LanguageManagerInterface;
 class RawEntityManager {
 
   /**
-   * Costruttore.
-   */
-  /**
    * L'entity type manager.
    *
    * @var \Drupal\Core\Entity\EntityTypeManagerInterface
@@ -236,6 +233,37 @@ class RawEntityManager {
                 $values[$delta]['image'] = $this->processField($target_entity->get('field_image'));
               }
             }
+          }
+          break;
+
+        case 'image':
+          $file_entity = $field->get($delta)->entity;
+          if ($file_entity) {
+            $file_uri = $file_entity->getFileUri();
+            $values[$delta] = [
+              'url' => \Drupal::service('file_url_generator')->generateAbsoluteString($file_uri),
+              'alt' => $value['alt'] ?? '',
+              'title' => $value['title'] ?? '',
+              'width' => $value['width'] ?? null,
+              'height' => $value['height'] ?? null,
+              'fid' => $file_entity->id(),
+              'filename' => $file_entity->getFilename(),
+              'filemime' => $file_entity->getMimeType(),
+            ];
+          }
+          break;
+
+        case 'file':
+          $file_entity = $field->get($delta)->entity;
+          if ($file_entity) {
+            $file_uri = $file_entity->getFileUri();
+            $values[$delta] = [
+              'url' => \Drupal::service('file_url_generator')->generateAbsoluteString($file_uri),
+              'fid' => $file_entity->id(),
+              'filename' => $file_entity->getFilename(),
+              'filemime' => $file_entity->getMimeType(),
+              'filesize' => $file_entity->getSize(),
+            ];
           }
           break;
 
