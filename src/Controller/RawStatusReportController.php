@@ -6,21 +6,25 @@ use Drupal\Core\Controller\ControllerBase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Cache\CacheBackendInterface;
 use Symfony\Component\HttpFoundation\Response;
 
 class RawStatusReportController extends ControllerBase {
   protected $configFactory;
   protected $entityTypeManager;
+  protected $cache;
 
-  public function __construct(ConfigFactoryInterface $configFactory, EntityTypeManagerInterface $entityTypeManager) {
+  public function __construct(ConfigFactoryInterface $configFactory, EntityTypeManagerInterface $entityTypeManager, CacheBackendInterface $cache) {
     $this->configFactory = $configFactory;
     $this->entityTypeManager = $entityTypeManager;
+    $this->cache = $cache;
   }
 
   public static function create(ContainerInterface $container) {
     return new static(
       $container->get('config.factory'),
-      $container->get('entity_type.manager')
+      $container->get('entity_type.manager'),
+      $container->get('cache.ildeposito_raw')
     );
   }
 
@@ -37,10 +41,10 @@ class RawStatusReportController extends ControllerBase {
       $entity_type = $raw_entity['entity_type'];
       foreach ($raw_entity['bundles'] as $bundle) {
         $query = $this->entityTypeManager->getStorage($entity_type)->getQuery()->accessCheck(FALSE);
-        if (in_array($entity_type, ['node', 'taxonomy_term', 'media'])) {
-          $query->condition('type', $bundle);
-        } elseif ($entity_type !== 'user') {
-          $query->condition('bundle', $bundle);
+        $entity_type_definition = $this->entityTypeManager->getDefinition($entity_type);
+        $bundle_key = $entity_type_definition->getKey('bundle');
+        if ($bundle_key) {
+          $query->condition($bundle_key, $bundle);
         }
         $entity_ids = $query->execute();
         $bundle_key = $entity_type . '--' . $bundle;
@@ -54,7 +58,7 @@ class RawStatusReportController extends ControllerBase {
           $total_entities++;
           $entities_per_bundle[$bundle_key]++;
           $cid = "ildeposito_raw:{$entity_type}:{$eid}";
-          $cache = \Drupal::cache()->get($cid);
+          $cache = $this->cache->get($cid);
           if ($cache && $cache->data) {
             $raw_per_bundle[$bundle_key]++;
           }

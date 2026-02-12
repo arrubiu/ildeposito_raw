@@ -4,7 +4,7 @@ services:
     arguments:
       - '@entity_type.manager'
       - '@config.factory'
-      - '@cache.default'
+      - '@cache.ildeposito_raw'
       - '@ildeposito_raw.manager'
     tags:
       - { name: drush.command }

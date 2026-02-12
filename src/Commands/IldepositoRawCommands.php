@@ -33,7 +33,7 @@ class IldepositoRawCommands extends DrushCommands {
   protected $configFactory;
 
   /**
-   * Il servizio cache.default.
+   * Il servizio cache.ildeposito_raw.
    *
    * @var \Drupal\Core\Cache\CacheBackendInterface
    */
@@ -54,7 +54,7 @@ class IldepositoRawCommands extends DrushCommands {
    * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
    *   Il servizio config.factory.
    * @param \Drupal\Core\Cache\CacheBackendInterface $cache
-   *   Il servizio cache.default.
+   *   Il servizio cache.ildeposito_raw.
    * @param \Drupal\ildeposito_raw\RawEntityManager $raw_manager
    *   Il servizio ildeposito_raw.manager.
    */
@@ -185,11 +185,10 @@ class IldepositoRawCommands extends DrushCommands {
           ->accessCheck(FALSE);
         
         // Aggiungi condizione per il bundle se necessario
-        if ($entity_type === 'node' || $entity_type === 'taxonomy_term' || $entity_type === 'media') {
-          $query->condition('type', $bundle);
-        }
-        elseif ($entity_type !== 'user') {
-          $query->condition('bundle', $bundle);
+        $entity_type_definition = $this->entityTypeManager->getDefinition($entity_type);
+        $bundle_key = $entity_type_definition->getKey('bundle');
+        if ($bundle_key) {
+          $query->condition($bundle_key, $bundle);
         }
         
         // Applica il limite se specificato

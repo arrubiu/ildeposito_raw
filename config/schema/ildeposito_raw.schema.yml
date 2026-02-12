@@ -2,6 +2,9 @@ ildeposito_raw.settings:
   type: config_object
   label: 'Impostazioni Il Deposito Raw'
   mapping:
+    cache_max_age:
+      type: integer
+      label: 'Durata massima della cache'
     raw_entities:
       type: sequence
       label: 'Entità con elaborazione raw'

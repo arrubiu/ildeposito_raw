@@ -5,6 +5,7 @@ namespace Drupal\ildeposito_raw\Form;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Entity\EntityDisplayRepositoryInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -18,10 +19,18 @@ class RawEntitySettingsForm extends ConfigFormBase {
   protected $entityTypeManager;
 
   /**
+   * Il repository degli entity display.
+   *
+   * @var \Drupal\Core\Entity\EntityDisplayRepositoryInterface
+   */
+  protected $entityDisplayRepository;
+
+  /**
    * Costruttore.
    */
-  public function __construct(EntityTypeManagerInterface $entity_type_manager) {
+  public function __construct(EntityTypeManagerInterface $entity_type_manager, EntityDisplayRepositoryInterface $entity_display_repository) {
     $this->entityTypeManager = $entity_type_manager;
+    $this->entityDisplayRepository = $entity_display_repository;
   }
 
   /**
@@ -29,7 +38,8 @@ class RawEntitySettingsForm extends ConfigFormBase {
    */
   public static function create(ContainerInterface $container) {
     return new static(
-      $container->get('entity_type.manager')
+      $container->get('entity_type.manager'),
+      $container->get('entity_display.repository')
     );
   }
 
@@ -111,29 +121,29 @@ class RawEntitySettingsForm extends ConfigFormBase {
       '#options' => $entity_types,
       '#required' => TRUE,
       '#ajax' => [
-        'callback' => '::updateBundleOptions',
-        'wrapper' => 'bundle-wrapper',
+        'callback' => '::updateEntityTypeFields',
+        'wrapper' => 'entity-type-dependent-wrapper',
       ],
     ];
 
-    $form['add']['bundles'] = [
+    $form['add']['entity_type_dependent'] = [
+      '#type' => 'container',
+      '#prefix' => '<div id="entity-type-dependent-wrapper">',
+      '#suffix' => '</div>',
+    ];
+
+    $form['add']['entity_type_dependent']['bundles'] = [
       '#type' => 'select',
       '#title' => $this->t('Bundle'),
       '#options' => $this->getBundleOptions($form_state->getValue('entity_type')),
       '#multiple' => TRUE,
       '#required' => TRUE,
-      '#prefix' => '<div id="bundle-wrapper">',
-      '#suffix' => '</div>',
     ];
 
-    $form['add']['view_modes'] = [
+    $form['add']['entity_type_dependent']['view_modes'] = [
       '#type' => 'select',
       '#title' => $this->t('View mode'),
-      '#options' => [
-        'default' => $this->t('Default'),
-        'full' => $this->t('Full'),
-        'teaser' => $this->t('Teaser'),
-      ],
+      '#options' => $this->getViewModeOptions($form_state->getValue('entity_type')),
       '#multiple' => TRUE,
       '#required' => TRUE,
     ];
@@ -148,10 +158,10 @@ class RawEntitySettingsForm extends ConfigFormBase {
   }
 
   /**
-   * Ajax callback per aggiornare le opzioni dei bundle.
+   * Ajax callback per aggiornare i campi dipendenti dal tipo di entità.
    */
-  public function updateBundleOptions(array &$form, FormStateInterface $form_state) {
-    return $form['add']['bundles'];
+  public function updateEntityTypeFields(array &$form, FormStateInterface $form_state) {
+    return $form['add']['entity_type_dependent'];
   }
 
   /**
@@ -173,6 +183,23 @@ class RawEntitySettingsForm extends ConfigFormBase {
   }
 
   /**
+   * Ottiene le opzioni delle view mode per un tipo di entità.
+   */
+  protected function getViewModeOptions($entity_type_id) {
+    $options = [];
+    
+    if ($entity_type_id) {
+      $view_modes = $this->entityDisplayRepository->getViewModes($entity_type_id);
+      
+      foreach ($view_modes as $view_mode_id => $view_mode_info) {
+        $options[$view_mode_id] = $view_mode_info['label'];
+      }
+    }
+    
+    return $options;
+  }
+
+  /**
    * {@inheritdoc}
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
@@ -182,8 +209,8 @@ class RawEntitySettingsForm extends ConfigFormBase {
     if ($entity_type = $form_state->getValue('entity_type')) {
       $raw_entities[] = [
         'entity_type' => $entity_type,
-        'bundles' => $form_state->getValue('bundles'),
-        'view_modes' => $form_state->getValue('view_modes'),
+        'bundles' => $form_state->getValue(['entity_type_dependent', 'bundles']),
+        'view_modes' => $form_state->getValue(['entity_type_dependent', 'view_modes']),
       ];
 
       $config->set('raw_entities', $raw_entities)->save();
